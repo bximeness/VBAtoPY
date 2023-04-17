@@ -1,0 +1,457 @@
+Sub IRCSExtratorV2()
+
+Dim TimeNextUpdate As Date
+Dim msg As MailItem
+Dim por As New By
+'Dim olapp As Outlook.Application
+
+Application.DisplayAlerts = False
+
+On Error GoTo Erro
+
+'Set olapp = New Outlook.Application 'ativa aplicação outlook
+'Set msg = olapp.CreateItem(olMailItem)
+
+'Define Inicio atualização||||||||||||||||||||||||||
+StartUD = Now()
+
+'Limpar variaveis|||||||||||||||||||||||||||||||||||
+Sor = ""
+IDT = ""
+LUSOR = ""
+LUIDT = ""
+
+'Executar Funções de Atualização||||||||||||||||||||
+QIS = AtualizarQIS 'Atualiza QIS
+Application.Wait (500)
+Sor = IRCSSor 'Atualiza SOR
+Application.Wait (500)
+IDT = IRCSIdt 'Atualiza IDT
+Application.Wait (500)
+LUSOR = LastUpdateSOR 'Atualiza mês passado SOR
+Application.Wait (500)
+LUIDT = LastUpdateIDT 'Atualiza mês passado IDT
+Application.Wait (500)
+
+'Carrega hora de fim da atualização
+FinishUD = Now()
+
+'Somador de tempo entre atualizações
+T4 = Now() + TimeValue("00:20:00")
+If Minute(Now()) >= 0 And Minute(Now()) < 20 Then
+    TimeNextUpdate = Day(T4) & "/" & Month(T4) & "/" & Year(T4) & " " & Hour(T4) & ":20:10"  'Programação da hora de atualização
+ElseIf Minute(Now()) >= 20 And Minute(Now()) < 40 Then
+    TimeNextUpdate = Day(T4) & "/" & Month(T4) & "/" & Year(T4) & " " & Hour(T4) & ":40:10"  'Programação da hora de atualização
+ElseIf Minute(Now()) >= 40 And Minute(Now()) < 59 Then
+    TimeNextUpdate = Day(T4) & "/" & Month(T4) & "/" & Year(T4) & " " & Hour(T4) & ":00:10"  'Programação da hora de atualização
+ElseIf Minute(Now()) = 59 Then
+    TimeNextUpdate = Day(T4) & "/" & Month(T4) & "/" & Year(T4) & " " & Hour(T4) & ":20:10"  'Programação da hora de atualização
+Else
+    TimeNextUpdate = Now() + TimeValue("00:05:00")
+End If
+
+'Gravar LOG Start UD, FinishUD, SOR, IDT, LUSOR, LUIDT
+Application.Wait (1000)
+UI = 0
+UI = Range("A" & Rows.Count).End(xlUp).Row + 1
+With Sheets("LogErros")
+    .Range("A" & UI) = StartUD
+    .Range("B" & UI) = Sor
+    .Range("C" & UI) = IDT
+    .Range("D" & UI) = LUSOR
+    .Range("E" & UI) = LUIDT
+    .Range("F" & UI) = FinishUD
+    .Range("G" & UI) = TimeNextUpdate
+End With
+
+If Sor = "ERRO" Or IDT = "ERRO" Or LUSOR = "ERRO" Or LUIDT = "ERRO" Then
+    Call ErroTratar
+    Exit Sub
+End If
+
+'Envia msg de status OK
+'msg.to = "bximenes@toyota.com.br; acesar@toyota.com.br"
+'msg.Subject = "\o/ - Power BI OK - \o/"
+'msg.body = "Aviso!" _
+'    & Chr(13) & " " _
+'    & Chr(13) & "Power BI atualizado com sucesso!!!" _
+'    & Chr(13) & " " _
+'    & Chr(13) & "Obrigado! /O\ " _
+'    & Chr(13) & " " _
+'    & Chr(13) & "Vou realizar a próxima atualização às " & TimeNextUpdate _
+'    & Chr(13) & "--------Sistema Automático de Extração de Dados IRCS--------"
+'msg.send
+
+Call UpDateSchedule(TimeNextUpdate)
+Exit Sub
+
+Erro:
+Call ErroTratar
+End Sub
+
+Function AtualizarQIS() As String
+
+VBA.Shell "cmd.exe /c ""C:\Users\sideline\OneDrive - TOYOTA DO BRASIL LTDA\Área de Trabalho\script QIS.vbs"" "
+End Function
+
+
+
+'///////////////////////////////////////////////////////////////////////////
+Function IRCSSor() As String
+
+On Error GoTo ErroTratar
+
+'------------------------------------------------------------------------
+'- - - - - - - - - - - - - Designed By Bruno Ximenes™ - - - - - - - - - -
+'------------------------------------------------------------------------
+
+Dim driver As New ChromeDriver
+Dim keys As New Selenium.keys
+Dim por As New By
+Dim msg As MailItem
+'Dim olapp As Outlook.Application
+Dim tempoR As Date
+Dim dtIni As Date
+Dim te1, te2, te3, te4 As Long
+
+te1 = 30000 'Tempo para mudança de página Web
+te2 = 500 'Tempo Espera após clique em botões
+te3 = 15000 'Tempo Espera para extração
+te4 = 50000 'Tempo Espera fechar navegador após download
+
+
+'Set olapp = New Outlook.Application 'ativa aplicação outlook
+'Set msg = olapp.CreateItem(olMailItem)
+
+'Define saída para erro de execução
+On Error GoTo ErroTratar
+Application.DisplayAlerts = False
+
+'limpa pasta de downloads
+If Dir("C:\Users\sideline\Downloads\*") <> "" Then
+    Kill "C:\Users\sideline\Downloads\*"
+End If
+    
+With driver
+'abrir google chrome
+        .Start
+        .SetPreference "download.default_directory", Replace(ThisWorkbook.FullName, ThisWorkbook.Name, "")
+        .SetPreference "download.directory_upgrade", True
+        .SetPreference "download.prompt_for_download", True
+    
+'nagevar até o site do IRCS
+        .Get "http://tdbsorsvr034/tdb-rcs-report/"
+        .Wait (2000)
+        .Window.Maximize
+                 
+'insere o usuario
+        On Error GoTo 0
+        Err.Clear
+        d = 0
+        On Error Resume Next
+        .FindElementById("j_username").SendKeys ("report_INSP_SOR")
+    .Wait (500)
+        a = Err.Number
+        While Err.Number <> 0 And d <= 100
+            Err.Clear
+            .FindElementById("j_username").SendKeys ("report_INSP_SOR")
+    .Wait (500)
+            d = d + 1
+        Wend
+        On Error GoTo ErroTratar
+        
+'insere a senha
+        .FindElementById("j_password").SendKeys ("Toyota01")
+         
+'clica no botão de login
+        extloc = "clica no botão de login SOR"
+        .FindElementByXPath("//span[contains(.,'Login')]").Click
+    .Wait (1500)
+         
+'abre o menu relatórios
+        On Error GoTo 0
+        Err.Clear
+        d = 0
+        On Error Resume Next
+        .FindElementByXPath("//span[contains(.,'Relatórios')]").ClickAndHold
+         a = Err.Number
+    .Wait (500)
+        While Err.Number <> 0 And d <= 100
+            Err.Clear
+            .FindElementByXPath("//span[contains(.,'Relatórios')]").ClickAndHold
+    .Wait (500)
+            d = d + 1
+        Wend
+        On Error GoTo ErroTratar
+      
+'clica no menu gerencial
+        extloc = "clica no menu gerencial SOR"
+        .FindElementByXPath("//span[contains(.,'Gerencial')]").Click
+    .Wait (2000)
+        
+'limpa campo de data incial
+        On Error GoTo 0
+        Err.Clear
+        d = 0
+        On Error Resume Next
+        .FindElementById("formSearch:dateFromId_input").Clear
+    .Wait (te2)
+        a = Err.Number
+        While Err.Number <> 0 And d <= 100
+            Err.Clear
+            .FindElementById("formSearch:dateFromId_input").Clear
+    .Wait (500)
+            d = d + 1
+        Wend
+        On Error GoTo ErroTratar
+    
+'insere 1º dia do mês
+        .FindElementById("formSearch:dateFromId_input").SendKeys (["01/" & Month(Now()) & "/" & Year(Now()) & " 00:00:00"])
+    .Wait (te2)
+        
+'clica no campo de Turno
+        .FindElementByXPath("//div[@id='formSearch:shiftId']/div[3]/span").Click
+    .Wait (te2)
+        
+'seleciona valor em branco
+        .FindElementByXPath("//div[15]/div/ul/li").Click
+    .Wait (te2)
+        
+'clica no campo de IRCS Reparo
+    extloc = "clica no campo de IRCS Reparo SOR"
+        .ExecuteScript ("window.scrollTo(0, document.body.scrollHeight)")
+        .FindElementByXPath("//div[@id='formSearch:rcsRepairId']/div[3]/span").Click
+    .Wait (te2)
+        
+'seleciona o valor em branco
+        .FindElementByXPath("//div[@id='formSearch:rcsRepairId_panel']/div/ul/li").Click
+    .Wait (te2)
+           
+'clica no botão extratores
+        extloc = "clica no botão extratores"
+        .FindElementByXPath("//button[@id='formSearch:extractorsId']/span").Click
+    .Wait (3000)
+          
+'Acessa aba Auditoria e extrai arquivo
+        extloc = "Acessa aba Auditoria e extrai arquivo SOR"
+    '    .FindElementById("form_1").Click
+        On Error GoTo 0
+        Err.Clear
+        d = 0
+        On Error Resume Next
+            .FindElementById("form_1").Click
+    .Wait (te2)
+        a = Err.Number
+        While Err.Number <> 0 And d <= 100
+            Err.Clear
+                .FindElementById("form_1").Click
+    .Wait (500)
+            d = d + 1
+        Wend
+        
+        On Error GoTo 0
+        Err.Clear
+        d = 0
+        On Error Resume Next
+        .FindElementById("form_1:j_id1630962372_2_6156d65b:backId2").Click
+        a = Err.Number
+        extloc = ""
+        While Err.Number <> 0 And d <= 100
+            Err.Clear
+            .FindElementById("form_1:j_id1630962372_2_6156d65b:backId2").Click
+    .Wait (500)
+            d = d + 1
+        Wend
+        On Error GoTo ErroTratar
+            
+'Acessa aba Vin por Período e extrai arquivo
+    extloc = "Acessa aba Vin por Período e extrai arquivo SOR"
+        .ExecuteScript ("window.scrollTo(0, document.body.scrollHeight)")
+        .FindElementById("form_2").Click
+    .Wait (2000)
+        On Error GoTo 0
+        Err.Clear
+        d = 0
+        On Error Resume Next
+        .ExecuteScript ("window.scrollTo(0, document.body.scrollHeight)")
+        .FindElementById("form_2:j_id1630962372_2_6156d65b_1:backId2").Click
+        a = Err.Number
+        While Err.Number <> 0 And d <= 100
+            Err.Clear
+            .ExecuteScript ("window.scrollTo(0, document.body.scrollHeight)")
+            .FindElementById("form_2:j_id1630962372_2_6156d65b_1:backId2").Click
+    .Wait (500)
+            d = d + 1
+        Wend
+        On Error GoTo ErroTratar
+        
+'Retorna para pag. incial
+    extloc = "Retorna para pag. incial SOR"
+        .ExecuteScript ("window.scrollTo(0, document.body.scrollHeight)")
+        .FindElementByXPath("//button[@id='formBack:backId']/span").Click
+    .Wait (2000)
+        
+'Inclui Auditoria
+        On Error GoTo 0
+        Err.Clear
+        d = 0
+        On Error Resume Next
+        .ExecuteScript ("window.scrollTo(0, document.body.scrollHeight)")
+        .FindElementByXPath("//table[@id='formSearch:repairAreaPickList']/tbody/tr/td/ul/li[2]").Click 'Seleciona Opção
+        .FindElementByXPath("//table[@id='formSearch:repairAreaPickList']/tbody/tr/td[2]/button/span").Click 'Envia Opção
+        .Wait (te2)
+        .FindElementByXPath("//table[@id='formSearch:repairAreaPickList']/tbody/tr/td/ul/li[1]").Click
+        .FindElementByXPath("//table[@id='formSearch:repairAreaPickList']/tbody/tr/td[2]/button/span").Click
+        .Wait (te2)
+        .FindElementByXPath("//table[@id='formSearch:repairAreaPickList']/tbody/tr/td/ul/li[3]").Click
+        .FindElementByXPath("//table[@id='formSearch:repairAreaPickList']/tbody/tr/td[2]/button/span").Click
+        .Wait (te2)
+        a = Err.Number
+        While Err.Number <> 0 And d <= 100
+            Err.Clear
+            .ExecuteScript ("window.scrollTo(0, document.body.scrollHeight)")
+            .FindElementByXPath("//table[@id='formSearch:repairAreaPickList']/tbody/tr/td/ul/li[2]").Click 'Seleciona Opção
+            .FindElementByXPath("//table[@id='formSearch:repairAreaPickList']/tbody/tr/td[2]/button/span").Click 'Envia Opção
+                .Wait (te2)
+            .FindElementByXPath("//table[@id='formSearch:repairAreaPickList']/tbody/tr/td/ul/li[1]").Click
+            .FindElementByXPath("//table[@id='formSearch:repairAreaPickList']/tbody/tr/td[2]/button/span").Click
+                .Wait (te2)
+            .FindElementByXPath("//table[@id='formSearch:repairAreaPickList']/tbody/tr/td/ul/li[3]").Click
+            .FindElementByXPath("//table[@id='formSearch:repairAreaPickList']/tbody/tr/td[2]/button/span").Click
+                .Wait (te2)
+            .Wait (1000)
+            d = d + 1
+        Wend
+        On Error GoTo ErroTratar
+        
+'clica na seta para enviar
+'        .FindElementByXPath("//table[@id='formSearch:repairAreaPickList']/tbody/tr/td[2]/button/span").Click
+'            .Wait (te2)
+         
+'clica no botão lista
+        .ExecuteScript ("window.scrollTo(0, document.body.scrollHeight)")
+        .FindElementByXPath("//button[@id='formSearch:listId']/span").Click
+    .Wait (3000)
+        
+'clica no botão exportar
+    extloc = "clica no botão exportar lista SOR"
+        .ExecuteScript ("window.scrollTo(0, document.body.scrollHeight)")
+    .Wait (10000)
+        On Error GoTo 0
+        Err.Clear
+        d = 0
+        On Error Resume Next
+        .ExecuteScript ("window.scrollTo(0, document.body.scrollHeight)")
+        .FindElementByXPath("//button[@id='formButton:exportId']/span").Click
+        a = Err.Number
+        While Err.Number <> 0 And d <= 100
+            Err.Clear
+            .ExecuteScript ("window.scrollTo(0, document.body.scrollHeight)")
+    .Wait (10000)
+            .FindElementByXPath("//button[@id='formButton:exportId']/span").Click
+    .Wait (1000)
+            d = d + 1
+        Wend
+    On Error GoTo ErroTratar
+    .Wait (te4)
+    .Close
+    
+End With
+
+'=============//////=====================
+'donwload = "C:\Users\sideline\Downloads\"
+'If Dir(donwload) < 3 Then
+'On Error GoTo ErroTratar
+'Else
+
+
+'Novo codigo para salvar arquivo---Auditoria----------------------
+Kill "C:\Users\sideline\TOYOTA DO BRASIL LTDA\QC INSPECTION ADM - ExtracaoIRCS\AuditoriaSOR\AD0321.xlsx"
+FileCopy "C:\Users\sideline\Downloads\file.xlsx", "C:\Users\sideline\TOYOTA DO BRASIL LTDA\QC INSPECTION ADM - ExtracaoIRCS\AuditoriaSOR\AD0321.xlsx"
+Kill "C:\Users\sideline\Downloads\file.xlsx"
+
+'Novo codigo para salvar arquivo---Vin Periodo--------------------
+'Kill "C:\Users\sideline\TOYOTA DO BRASIL LTDA\QC INSPECTION ADM - ExtracaoIRCS\VinPeriodoSOR\" & "SORVP" & Format(Now(), "MM") & Format(Now(), "YY") & ".xlsx"
+'FileCopy "C:\Users\sideline\Downloads\file (1).xlsx", "C:\Users\sideline\TOYOTA DO BRASIL LTDA\QC INSPECTION ADM - ExtracaoIRCS\VinPeriodoSOR\" & "SORVP" & Format(Now(), "MM") & Format(Now(), "YY") & ".xlsx"
+'Kill "C:\Users\sideline\Downloads\file (1).xlsx"
+
+'Novo codigo para salvar arquivo---Gerencial----------------------
+'Kill "C:\Users\sideline\TOYOTA DO BRASIL LTDA\QC INSPECTION ADM - ExtracaoIRCS\GerencialSOR\" & "SORGR" & Format(Now(), "MM") & Format(Now(), "YY") & ".xlsx"
+'FileCopy "C:\Users\sideline\Downloads\file (2).xlsx", "C:\Users\sideline\TOYOTA DO BRASIL LTDA\QC INSPECTION ADM - ExtracaoIRCS\GerencialSOR\" & "SORGR" & Format(Now(), "MM") & Format(Now(), "YY") & ".xlsx"
+'Kill "C:\Users\sideline\Downloads\file (2).xlsx"
+
+'
+''ABRIR ARQUIVO AUDITORIA E SALVAR COMO-------------------
+'Workbooks.Open Filename:="C:\Users\sideline\Downloads\file.xls"
+'ActiveWorkbook.SaveAs Filename:="C:\DADOS IRCS\AD0321.xlsx", FileFormat:=xlOpenXMLWorkbook, CreateBackup:=False
+'Application.Wait (200)
+'ActiveWorkbook.Close
+'
+''deleta arquivo -----------------------------------------
+'Kill "C:\Users\sideline\Downloads\file.xls"
+'Kill "C:\Users\sideline\TOYOTA DO BRASIL LTDA\QC INSPECTION ADM - ExtracaoIRCS\AuditoriaSOR\AD0321.xlsx"
+'FileCopy "C:\DADOS IRCS\AD0321.xlsx", "C:\Users\sideline\TOYOTA DO BRASIL LTDA\QC INSPECTION ADM - ExtracaoIRCS\AuditoriaSOR\AD0321.xlsx"
+'Kill "C:\DADOS IRCS\AD0321.xlsx"
+'
+''ABRIR ARQUIVO VIN PERIODO E SALVAR COMO-----------------
+'Workbooks.Open Filename:="C:\Users\sideline\Downloads\file (1).xls"
+'VinPeriodo = "C:\DADOS IRCS\" & "SORVP" & Format(Now(), "MM") & Format(Now(), "YY") & ".xlsx"
+'ActiveWorkbook.SaveAs Filename:=VinPeriodo _
+'        , FileFormat:=xlOpenXMLWorkbook, CreateBackup:=False
+'Application.Wait (200)
+'ActiveWorkbook.Close
+'
+''deleta arquivo -----------------------------------------
+'Kill "C:\Users\sideline\Downloads\file (1).xls"
+
+VinPeriodoSor = "C:\Users\sideline\TOYOTA DO BRASIL LTDA\QC INSPECTION ADM - ExtracaoIRCS\VinPeriodoSOR\" & "SORVP" & Format(Now(), "MM") & Format(Now(), "YY") & ".xlsx"
+If Dir(VinPeriodoSor) = vbNullString Then
+VinPeriodoSor = False
+Else
+VinPeriodoSor = True
+End If
+
+'Verifica se arquivo existe na pasta para excluir e salvar novo
+If VinPeriodoSor Then
+Kill "C:\Users\sideline\TOYOTA DO BRASIL LTDA\QC INSPECTION ADM - ExtracaoIRCS\VinPeriodoSOR\" & "SORVP" & Format(Now(), "MM") & Format(Now(), "YY") & ".xlsx"
+FileCopy "C:\Users\sideline\Downloads\file (1).xlsx", "C:\Users\sideline\TOYOTA DO BRASIL LTDA\QC INSPECTION ADM - ExtracaoIRCS\VinPeriodoSOR\" & "SORVP" & Format(Now(), "MM") & Format(Now(), "YY") & ".xlsx"
+Kill "C:\Users\sideline\Downloads\file (1).xlsx"
+
+Else
+FileCopy "C:\Users\sideline\Downloads\file (1).xlsx", "C:\Users\sideline\TOYOTA DO BRASIL LTDA\QC INSPECTION ADM - ExtracaoIRCS\VinPeriodoSOR\" & "SORVP" & Format(Now(), "MM") & Format(Now(), "YY") & ".xlsx"
+Kill "C:\Users\sideline\Downloads\file (1).xlsx"
+End If
+'
+''ABRIR ARQUIVO GERENCIAL E SALVAR COMO-------------------
+GerencialSor = "C:\Users\sideline\TOYOTA DO BRASIL LTDA\QC INSPECTION ADM - ExtracaoIRCS\GerencialSOR\" & "SORGR" & Format(Now(), "MM") & Format(Now(), "YY") & ".xlsx"
+If Dir(GerencialSor) = vbNullString Then
+GerencialSor = False
+Else
+GerencialSor = True
+End If
+
+'Verifica se arquivo existe na pasta para excluir e salvar novo
+If GerencialSor Then
+Kill "C:\Users\sideline\TOYOTA DO BRASIL LTDA\QC INSPECTION ADM - ExtracaoIRCS\GerencialSOR\" & "SORGR" & Format(Now(), "MM") & Format(Now(), "YY") & ".xlsx"
+FileCopy "C:\Users\sideline\Downloads\file (2).xlsx", "C:\Users\sideline\TOYOTA DO BRASIL LTDA\QC INSPECTION ADM - ExtracaoIRCS\GerencialSOR\" & "SORGR" & Format(Now(), "MM") & Format(Now(), "YY") & ".xlsx"
+Kill "C:\Users\sideline\Downloads\file (2).xlsx"
+
+Else
+FileCopy "C:\Users\sideline\Downloads\file (2).xlsx", "C:\Users\sideline\TOYOTA DO BRASIL LTDA\QC INSPECTION ADM - ExtracaoIRCS\GerencialSOR\" & "SORGR" & Format(Now(), "MM") & Format(Now(), "YY") & ".xlsx"
+Kill "C:\Users\sideline\Downloads\file (2).xlsx"
+End If
+
+IRCSSor = "OK"
+
+'End If
+Exit Function
+
+ErroTratar:
+
+IRCSSor = "ERRO"
+'não pode ter comando
+End Function
+'///////////////////////////////////////////////////////////////////////////////
+Function IRCSIdt() As String
+
+On Error GoTo ErroTratar
